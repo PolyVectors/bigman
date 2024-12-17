@@ -7,6 +7,7 @@ fn transpile_to_intermediary_bytecode(source: &str) -> (Vec<String>, HashMap<u8,
 
     let mut padded_lines = Vec::with_capacity(lines.len());
 
+    // todo: make into parallel iter and map
     for line in lines.iter() {
         let mut symbols = line.split_whitespace().collect::<Vec<&str>>();
         symbols.resize(3, "");
@@ -148,6 +149,7 @@ fn transpile_to_machine_code(
 
     machine_code.resize(100, 0);
 
+    // todo: make into parallel iter
     for (address, value) in address_to_value.iter() {
         machine_code[(*address) as usize] = *value;
     }
