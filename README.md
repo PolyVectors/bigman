@@ -15,4 +15,5 @@ A Little Man Computer (LMC) Virtual Machine that handles compilation from Assemb
 - [ ] Find slow functions to optimize (w/ flamegraph)
 - [x] Unified result type (w/ eyre)
 - [x] Colourful error reporting (w/ eyre)
+- [ ] Better variable names (from Wikipedia)
 
