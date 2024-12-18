@@ -9,6 +9,7 @@ A Little Man Computer (LMC) Virtual Machine that handles compilation from Assemb
 
 # todo!()
 - [ ] Optimal clippy setup
-- [ ] Parallelization (w/ rayon)
-- [ ] Unified result type (w/ eyre)
-- [ ] Colourful error reporting (w/ eyre)
+- [x] Parallelization (w/ rayon)
+- [x] Unified result type (w/ eyre)
+- [x] Colourful error reporting (w/ eyre)
+- [ ] Stack-heap hybrid memory allocation (w/ smallvec)
