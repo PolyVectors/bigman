@@ -9,6 +9,7 @@ A Little Man Computer (LMC) Virtual Machine that handles compilation from Assemb
 
 # todo!()
 - [ ] Optimal clippy setup
+- [ ] Add tests
 - [x] Parallelization (w/ rayon)
 - [ ] Faster HashMaps (w/ aHash)
 - [ ] Stack-heap hybrid memory allocation (w/ smallvec)
