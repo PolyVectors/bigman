@@ -1,30 +1,28 @@
 use crate::compiler::instructions::{Instruction, INSTRUCTION};
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
+use smallvec::SmallVec;
+use ahash::{HashMap, HashMapExt};
 
 fn transpile_to_intermediary_bytecode(
     source: &str,
 ) -> (Arc<Mutex<Vec<String>>>, Arc<Mutex<HashMap<u8, i32>>>) {
-    let lines = source.split('\n').collect::<Vec<&str>>();
+    let lines: Vec<&str> = source.split('\n').collect();
 
-    let padded_lines = lines
+    let padded_lines: Vec<[&str; 3]> = lines
         .par_iter()
         .map(|line| {
-            let mut symbols = line.split_whitespace().collect::<Vec<&str>>();
+            let mut symbols = line.split_whitespace().collect::<Vec<_>>();
             symbols.resize(3, "");
-
-            symbols
+            TryInto::<[&str; 3]>::try_into(symbols).unwrap()
         })
-        .collect::<Vec<_>>();
+        .collect();
 
-    let (data_label_to_address, address_to_value, cell_labels) = (
-        Arc::new(Mutex::from(HashMap::new())),
-        Arc::new(Mutex::from(HashMap::new())),
-        Arc::new(Mutex::from(HashMap::new())),
-    );
+    let data_label_to_address: Arc<Mutex<HashMap<&str, u8>>> = Arc::new(Mutex::from(HashMap::new()));
+    let address_to_value: Arc<Mutex<HashMap<u8, i32>>> = Arc::new(Mutex::new(HashMap::new()));
+    let cell_labels: Arc<Mutex<HashMap<&str, u8>>> = Arc::new(Mutex::new(HashMap::new()));
 
     let (
         data_label_to_address_for_closures,
@@ -66,7 +64,7 @@ fn transpile_to_intermediary_bytecode(
 
     let intermediary_bytecode = Arc::new(Mutex::from(Vec::new()));
 
-    let unsorted_intermediary_bytecode: Vec<(usize, Vec<String>)> = lines
+    let unsorted_intermediary_bytecode: Vec<(usize, SmallVec<[String; 32]>)> = lines
         .par_iter()
         .enumerate()
         .map(|(i, line)| {
@@ -75,7 +73,7 @@ fn transpile_to_intermediary_bytecode(
                 cell_labels_for_closures.lock().unwrap(),
             );
 
-            let mut intermediary_bytecode = Vec::new();
+            let mut intermediary_bytecode: SmallVec<[String; 32]> = SmallVec::new();
 
             for (i, symbol) in line.split_whitespace().enumerate() {
                 if i == 0 && !cell_labels.contains_key(symbol) {
@@ -98,8 +96,7 @@ fn transpile_to_intermediary_bytecode(
                 }
             }
 
-            (i, intermediary_bytecode)
-        })
+            (i, intermediary_bytecode)})
         .collect();
 
     for (_, line) in unsorted_intermediary_bytecode {
@@ -117,13 +114,17 @@ fn transpile_to_bytecode(
     let address_to_value = intermediary_bytecode_address_to_value_pair.1;
 
     let bytecode = Arc::new(Mutex::from(Vec::new()));
-    let (intermediary_bytecode_for_closure, bytecode_for_closure) = (Arc::clone(&intermediary_bytecode).lock().unwrap().clone(), Arc::clone(&bytecode));
+    
+    let (intermediary_bytecode_for_closure, bytecode_for_closure) = (
+        Arc::clone(&intermediary_bytecode).lock().unwrap().clone(),
+        Arc::clone(&bytecode)
+    );
 
     for (i, symbol) in intermediary_bytecode_for_closure.iter().enumerate() {
         let mut bytecode = bytecode_for_closure.lock().unwrap(); 
         
-        match INSTRUCTION.contains_key(symbol) {
-            true => match symbol.as_str() {
+        if INSTRUCTION.contains_key(symbol) {
+            match symbol.as_str() {
                 instruction @ ("ADD" | "SUB") => {
                     let value = intermediary_bytecode_for_closure[i + 1].parse::<i32>().unwrap();
 
@@ -134,22 +135,14 @@ fn transpile_to_bytecode(
                     });
                 }
                 instruction @ ("BRA" | "BRP" | "BRZ" | "LDA" | "STA") => {
+                    let address = intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap();
+                                        
                     if let Some(instruction) = match instruction {
-                        "BRA" => Some(Instruction::Branch(
-                            intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap(),
-                        )),
-                        "BRP" => Some(Instruction::BranchIfPositive(
-                            intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap(),
-                        )),
-                        "BRZ" => Some(Instruction::BranchIfZero(
-                            intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap(),
-                        )),
-                        "LDA" => Some(Instruction::Load(
-                            intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap(),
-                        )),
-                        "STA" => Some(Instruction::Store(
-                            intermediary_bytecode_for_closure[i + 1].parse::<u8>().unwrap(),
-                        )),
+                        "BRA" => Some(Instruction::Branch(address)),
+                        "BRP" => Some(Instruction::BranchIfPositive(address)),
+                        "BRZ" => Some(Instruction::BranchIfZero(address)),
+                        "LDA" => Some(Instruction::Load(address)),
+                        "STA" => Some(Instruction::Store(address)),
                         _ => None,
                     } {
                         bytecode.push(instruction);
@@ -161,9 +154,9 @@ fn transpile_to_bytecode(
                     "OUT" => Instruction::Output,
                     _ => unreachable!(),
                 }),
+                
                 _ => {}
-            },
-            false => {}
+            }
         }
     };
 
